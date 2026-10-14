@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ma Trận Tô Màu - Bài 9. Protein và Enzyme</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: #f8fafc;
+            user-select: none;
+        }
+
+        /* Tùy chỉnh thanh cuộn cho danh sách câu hỏi */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Lưới ma trận 24 cột chuẩn theo ảnh gốc */
+        .matrix-grid {
+            display: grid;
+            grid-template-columns: repeat(24, minmax(0, 1fr));
+            gap: 2px;
+            background-color: #e2e8f0;
+            padding: 6px;
+            border-radius: 12px;
+            border: 1px solid #cbd5e1;
+        }
+
+        .matrix-cell {
+            aspect-ratio: 1 / 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: clamp(0.55rem, 1.1vw, 0.8rem);
+            background-color: #ffffff;
+            color: #1e293b;
+            border-radius: 3px;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: inset 0 0 0 1px rgba(0,0,0,0.04);
+        }
+
+        .matrix-cell.colored {
+            color: #ffffff !important;
+            transform: scale(1.06);
+            z-index: 2;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+
+        /* Hiệu ứng nút câu trả lời */
+        .option-btn {
+            transition: all 0.2s ease;
+        }
+        .option-btn:hover:not(:disabled) {
+            border-color: #93c5fd;
+            background-color: #f8fafc;
+            transform: translateY(-1px);
+        }
+        .option-btn.correct {
+            background-color: #16a34a !important;
+            border-color: #15803d !important;
+            color: #ffffff !important;
+        }
+        .option-btn.correct .badge-letter {
+            background-color: #fde047 !important;
+            color: #1e293b !important;
+        }
+        .option-btn.wrong {
+            background-color: #fee2e2 !important;
+            border-color: #f87171 !important;
+            color: #991b1b !important;
+        }
+        .option-btn.wrong .badge-letter {
+            background-color: #ef4444 !important;
+            color: #ffffff !important;
+        }
+
+        /* Chế độ in / Xuất PDF */
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .no-print {
+                display: none !important;
+            }
+            #questions-container {
+                max-height: none !important;
+                overflow: visible !important;
+            }
+            .main-layout {
+                display: block !important;
+            }
+            .panel-box {
+                break-inside: avoid;
+                margin-bottom: 20px;
+                box-shadow: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen p-2 md:p-4 flex items-center justify-center">
+
+    <div class="main-layout w-full max-w-[1440px] grid grid-cols-1 lg:grid-cols-12 gap-4">
+        
+        <!-- CỘT TRÁI: MA TRẬN TÔ MÀU (Chiếm 6/12 cột) -->
+        <div class="panel-box lg:col-span-6 bg-[#fffdf7] border-[2.5px] border-dashed border-amber-300 rounded-3xl p-4 md:p-5 shadow-sm flex flex-col justify-between">
+            <div>
+                <!-- Header Cột Trái -->
+                <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-amber-200/80">
+                    <h1 class="text-xl md:text-2xl font-black text-red-600 tracking-wide uppercase">
+                        MA TRẬN TÔ MÀU
+                    </h1>
+                    <div onclick="editTeacherName()" title="Nhấn để đổi tên giáo viên" class="cursor-pointer bg-amber-100/90 hover:bg-amber-200 border border-amber-300 text-slate-800 text-xs md:text-sm font-bold px-3.5 py-1.5 rounded-full transition shadow-2xs">
+                        Design: <span id="teacher-name">ThS Lê Minh Thu</span>
+                    </div>
+                </div>
+
+                <!-- Thông tin Học sinh -->
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 mb-3">
+                    <div class="sm:col-span-8 flex items-center bg-pink-50/70 border border-pink-200 rounded-2xl px-3.5 py-2 focus-within:ring-2 focus-within:ring-pink-300 transition">
+                        <span class="text-sm mr-1.5">🌸</span>
+                        <span class="text-xs md:text-sm font-bold text-pink-900 whitespace-nowrap mr-2">Họ và tên:</span>
+                        <input type="text" placeholder="Nhập tên của em..." class="w-full bg-transparent text-xs md:text-sm font-semibold text-slate-800 focus:outline-none placeholder-pink-300">
+                    </div>
+                    <div class="sm:col-span-4 flex items-center bg-sky-50/70 border border-sky-200 rounded-2xl px-3.5 py-2 focus-within:ring-2 focus-within:ring-sky-300 transition">
+                        <span class="text-sm mr-1.5">⭐</span>
+                        <span class="text-xs md:text-sm font-bold text-sky-900 whitespace-nowrap mr-2">Lớp:</span>
+                        <input type="text" placeholder="Nhập lớp..." class="w-full bg-transparent text-xs md:text-sm font-semibold text-slate-800 focus:outline-none placeholder-sky-300">
+                    </div>
+                </div>
+
+                <!-- Khung Thông điệp -->
+                <div class="bg-orange-50/60 border-2 border-dashed border-orange-200 rounded-2xl px-4 py-2.5 mb-3 flex items-center justify-between">
+                    <span class="text-xs md:text-sm font-bold text-amber-900">Thông điệp:</span>
+                    <span id="secret-message" class="text-sm md:text-lg font-black text-red-600 tracking-wider uppercase transition-all duration-500">
+                        MẸ LÀ TẤT CẢ
+                    </span>
+                    <button onclick="toggleMessage()" class="no-print text-[11px] font-semibold text-amber-700 hover:text-amber-900 underline ml-2" id="toggle-msg-btn">
+                        Ẩn đi
+                    </button>
+                </div>
+
+                <!-- Tiêu đề Bảng mật mã -->
+                <div class="text-center mb-2">
+                    <h2 class="text-xs md:text-sm font-extrabold text-blue-900 uppercase tracking-wider">
+                        BẢNG MẬT MÃ - TÔ MÀU THEO ĐÁP ÁN ĐÚNG
+                    </h2>
+                </div>
+
+                <!-- Lưới Ma Trận Pixel -->
+                <div id="matrix-board" class="matrix-grid mb-3">
+                    <!-- Render bằng JavaScript -->
+                </div>
+            </div>
+
+            <!-- Chú thích màu sắc (Footer Cột Trái) -->
+            <div class="pt-2 border-t border-amber-200/60">
+                <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-[11px] md:text-xs font-extrabold text-slate-800">
+                    <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-[#ef4444] inline-block"></span>T-Đỏ</div>
+                    <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-[#f59e0b] inline-block"></span>R-Vàng</div>
+                    <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-[#10b981] inline-block"></span>I-Xanh lá</div>
+                    <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-[#ef4444] inline-block"></span>A-Đỏ</div>
+                    <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-[#10b981] inline-block"></span>N-Xanh lá</div>
+                    <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-[#a855f7] inline-block"></span>H-Tím</div>
+                    <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-[#f97316] inline-block"></span>Y-Cam</div>
+                    <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-[#3b82f6] inline-block"></span>C-Xanh dương</div>
+                    <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-[#ec4899] inline-block"></span>O-Hồng</div>
+                    <div class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-[#14b8a6] inline-block"></span>B-Lục lam</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CỘT PHẢI: DANH SÁCH CÂU HỎI (Chiếm 6/12 cột) -->
+        <div class="panel-box lg:col-span-6 bg-white border-[2.5px] border-blue-100 rounded-3xl p-4 md:p-5 shadow-sm flex flex-col justify-between h-full max-h-[95vh]">
+            
+            <!-- Header Cột Phải -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-100 bg-blue-50/50 -mx-4 -mt-4 p-4 rounded-t-3xl">
+                <h2 class="text-lg md:text-xl font-black text-blue-900 uppercase tracking-tight">
+                    BÀI 9. PROTEIN VÀ ENZYME
+                </h2>
+                <div class="flex items-center gap-2">
+                    <!-- Nút Con mắt (Xem trước bức tranh hoàn chỉnh chỉ với 1 cú nhấp chuột) -->
+                    <button id="preview-eye-btn" onclick="revealAllColors()" title="Xem trước bức tranh hoàn chỉnh" class="no-print w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-amber-50 hover:text-amber-600 transition shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                    </button>
+                    <!-- Nút Toàn màn hình -->
+                    <button onclick="toggleFullScreen()" title="Toàn màn hình" class="no-print w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                        </svg>
+                    </button>
+                    <!-- Nút Chơi lại từ đầu -->
+                    <button onclick="resetAllGame()" title="Làm lại từ đầu" class="no-print w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-red-50 hover:text-red-600 transition shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                    </button>
+                    <!-- Huy hiệu Điểm số -->
+                    <div id="score-badge" class="bg-blue-600 text-white text-xs md:text-sm font-extrabold px-4 py-1.5 rounded-full shadow-sm">
+                        0/10 đúng
+                    </div>
+                </div>
+            </div>
+
+            <!-- Danh sách câu hỏi (Có cuộn dọc) -->
+            <div id="questions-container" class="custom-scrollbar overflow-y-auto pr-1.5 space-y-3.5 flex-1 max-h-[64vh]">
+                <!-- Render bằng JavaScript -->
+            </div>
+
+            <!-- Footer Cột Phải -->
+            <div class="pt-3 mt-3 border-t border-slate-100 no-print">
+                <div class="grid grid-cols-2 gap-3 mb-2">
+                    <button onclick="retryWrongQuestions()" class="bg-[#0f172a] hover:bg-slate-800 active:scale-[0.99] text-white font-extrabold text-xs md:text-sm py-3 rounded-full shadow transition uppercase tracking-wider">
+                        LÀM LẠI CÂU SAI
+                    </button>
+                    <button onclick="window.print()" class="bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 active:scale-[0.99] text-white font-extrabold text-xs md:text-sm py-3 rounded-full shadow transition uppercase tracking-wider">
+                        XUẤT FILE PDF
+                    </button>
+                </div>
+                <div id="status-message" class="text-center text-xs md:text-sm font-extrabold text-emerald-600 min-h-[20px]">
+                    Hãy chọn đáp án đúng ở từng câu hỏi để tô màu bức tranh mật mã!
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Modal thay đổi tên giáo viên (Không dùng prompt mặc định) -->
+    <div id="teacher-modal" class="fixed inset-0 bg-black/40 backdrop-blur-xs hidden items-center justify-center z-50">
+        <div class="bg-white rounded-2xl p-5 w-80 shadow-xl border border-slate-100">
+            <h3 class="font-bold text-slate-800 text-sm mb-2">Đổi tên tác giả / Giáo viên:</h3>
+            <input id="teacher-input" type="text" class="w-full border border-slate-300 rounded-xl px-3 py-2 text-sm font-semibold mb-3 focus:outline-none focus:ring-2 focus:ring-amber-400">
+            <div class="flex justify-end gap-2">
+                <button onclick="closeTeacherModal()" class="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg">Hủy</button>
+                <button onclick="saveTeacherName()" class="px-4 py-1.5 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-lg">Lưu</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * 1. DỮ LIỆU MA TRẬN PIXEL (17 hàng x 24 cột khớp 100% ảnh gốc để hiện trọn vẹn số 2010 và trái tim)
+         */
+        const MATRIX_DATA = [
+            "Z W K E E L E J L E V L V F M G E Q V V J Q E F".split(" "),
+            "D J J E O O G O O P E Q G V Q H H Z H H U J P E".split(" "),
+            "M U Q O O O B B B B F J M V Y Y Y Y Y Y W Z U".concat(" E").split(" ").slice(0,24),
+            "U U Q B B B R B B B W T T V Y Y Y R Y Y Y V P L".split(" "),
+            "W F L J B B B B B G T C C T P Y Y C C C P L S V".split(" "),
+            "J L G L L I I I G P T C C T X D N N N J U J Q P".split(" "),
+            "Q Q M V U V I I Z E W T T L U P N N P M D Q U E".split(" "),
+            "P X Q V L K D I I I W A A M N N H J F G Z U J J".split(" "),
+            "F G Q L J K Z S J F V Z D J V M E L Z E L M D Q".split(" "),
+            "Q T T T T F R R R R S P D X W A A V X C C C C X".split(" "),
+            "K V L F T Q R K Z R S X M S A A A J K C Q Q C D".split(" "),
+            "S T T T R J R E E I M C C D W N N Z G O V Q O K".split(" "),
+            "X R Q G Q G I M V I Z Z Q G P N N G M O Q P O X".split(" "),
+            "M R R R R U I I I I K X M V N N N N M O O O O U".split(" "),
+            "S P G K V X W D V D P D L W K M W K E Q W G Q Q".split(" "),
+            "Q X W A A A A A A A A H H H H H H H H H P W W".concat(" Q").split(" ").slice(0,24),
+            "V Z D F L D L Q J S V J Z M D P J U J U V U X V".split(" ")
+        ];
+
+        // Đảm bảo dòng 3 và dòng 16 chuẩn xác từng ký tự theo đúng hình gốc
+        MATRIX_DATA[2]  = "M U Q O O O B B B B F J M V Y Y Y Y Y Y W Z U E".split(" ");
+        MATRIX_DATA[15] = "Q X W A A A A A A A A H H H H H H H H H P W W Q".split(" ");
+
+        /**
+         * 2. BẢNG MÀU TƯƠNG ỨNG VỚI CHỮ CÁI ĐÁP ÁN ĐÚNG
+         */
+        const COLOR_MAP = {
+            'T': { color: '#ef4444', name: 'Đỏ' },
+            'R': { color: '#f59e0b', name: 'Vàng' },
+            'I': { color: '#10b981', name: 'Xanh lá' },
+            'A': { color: '#ef4444', name: 'Đỏ' },
+            'N': { color: '#10b981', name: 'Xanh lá' },
+            'H': { color: '#a855f7', name: 'Tím' },
+            'Y': { color: '#f97316', name: 'Cam' },
+            'C': { color: '#3b82f6', name: 'Xanh dương' },
+            'O': { color: '#ec4899', name: 'Hồng' },
+            'B': { color: '#14b8a6', name: 'Lục lam' }
+        };
+
+        /**
+         * 3. DANH SÁCH 10 CÂU HỎI TRẮC NGHIỆM (Khớp nội dung Bài 9: Protein và Enzyme)
+         */
+        const QUESTIONS = [
+            {
+                id: 1,
+                question: "Câu 1. Hợp chất nào sau đây thuộc loại protein?",
+                layout: "grid-cols-2 sm:grid-cols-4", // 4 đáp án ngắn trên 1 hàng
+                correctLetter: "T",
+                options: [
+                    { letter: "U", text: "Saccharose." },
+                    { letter: "M", text: "Triglyceride." },
+                    { letter: "T", text: "Albumin." },
+                    { letter: "Z", text: "Cellulose." }
+                ]
+            },
+            {
+                id: 2,
+                question: "Câu 2. Protein nào sau đây không phải là protein dạng sợi?",
+                layout: "grid-cols-2 sm:grid-cols-4",
+                correctLetter: "R",
+                options: [
+                    { letter: "R", text: "Amylase." },
+                    { letter: "U", text: "Collagen." },
+                    { letter: "J", text: "Fibroin." },
+                    { letter: "P", text: "Keratin." }
+                ]
+            },
+            {
+                id: 3,
+                question: "Câu 3. Chất cơ sở để hình thành nên các phân tử protein đơn giản là",
+                layout: "grid-cols-1 sm:grid-cols-2", // 2 cột x 2 hàng
+                correctLetter: "I",
+                options: [
+                    { letter: "I", text: "α-amino acid." },
+                    { letter: "W", text: "acid béo." },
+                    { letter: "F", text: "các loại đường." },
+                    { letter: "E", text: "tinh bột." }
+                ]
+            },
+            {
+                id: 4,
+                question: "Câu 4. Protein là hợp chất cao phân tử được hình thành từ một hay nhiều chuỗi",
+                layout: "grid-cols-1 sm:grid-cols-2",
+                correctLetter: "A",
+                options: [
+                    { letter: "L", text: "amylopectin." },
+                    { letter: "S", text: "polypropylene." },
+                    { letter: "Q", text: "polysaccharide." },
+                    { letter: "A", text: "polypeptide." }
+                ]
+            },
+            {
+                id: 5,
+                question: "Câu 5. Protein nào sau đây có trong lòng trắng trứng?",
+                layout: "grid-cols-2 sm:grid-cols-4",
+                correctLetter: "N",
+                options: [
+                    { letter: "W", text: "Fibroin." },
+                    { letter: "N", text: "Albumin." },
+                    { letter: "M", text: "Keratin." },
+                    { letter: "F", text: "Hemoglobin." }
+                ]
+            },
+            {
+                id: 6,
+                question: "Câu 6. Phản ứng giữa albumin (có trong lòng trắng trứng) với Cu(OH)₂ trong môi trường kiềm được gọi là phản ứng",
+                layout: "grid-cols-1 sm:grid-cols-2",
+                correctLetter: "H",
+                options: [
+                    { letter: "H", text: "màu biuret." },
+                    { letter: "Z", text: "thủy phân." },
+                    { letter: "P", text: "trùng ngưng." },
+                    { letter: "K", text: "xà phòng hóa." }
+                ]
+            },
+            {
+                id: 7,
+                question: "Câu 7. Khi nhỏ dung dịch HNO₃ đặc vào lòng trắng trứng, hiện tượng quan sát được là",
+                layout: "grid-cols-1 sm:grid-cols-2",
+                correctLetter: "Y",
+                options: [
+                    { letter: "V", text: "kết tủa màu tím." },
+                    { letter: "Y", text: "kết tủa màu vàng." },
+                    { letter: "D", text: "sủi bọt khí không màu." },
+                    { letter: "Q", text: "dung dịch trong suốt." }
+                ]
+            },
+            {
+                id: 8,
+                question: "Câu 8. Hiện tượng riêu cua nổi lên khi nấu canh cua là do sự",
+                layout: "grid-cols-1 sm:grid-cols-2",
+                correctLetter: "C",
+                options: [
+                    { letter: "C", text: "đông tụ protein bởi nhiệt độ." },
+                    { letter: "X", text: "thủy phân protein." },
+                    { letter: "G", text: "hòa tan của protein." },
+                    { letter: "L", text: "phân hủy của chất béo." }
+                ]
+            },
+            {
+                id: 9,
+                question: "Câu 9. Phần lớn enzyme trong cơ thể sinh vật có bản chất là",
+                layout: "grid-cols-2 sm:grid-cols-4",
+                correctLetter: "O",
+                options: [
+                    { letter: "E", text: "Lipid." },
+                    { letter: "O", text: "Protein." },
+                    { letter: "W", text: "Glucid." },
+                    { letter: "J", text: "Vitamin." }
+                ]
+            },
+            {
+                id: 10,
+                question: "Câu 10. Vai trò chủ yếu của enzyme trong các phản ứng sinh hóa là",
+                layout: "grid-cols-1 sm:grid-cols-2",
+                correctLetter: "B",
+                options: [
+                    { letter: "B", text: "chất xúc tác sinh học." },
+                    { letter: "S", text: "cung cấp năng lượng." },
+                    { letter: "U", text: "vận chuyển khí oxygen." },
+                    { letter: "M", text: "dự trữ các amino acid." }
+                ]
+            }
+        ];
+
+        // Trạng thái trò chơi
+        let questionState = {}; // Lưu trạng thái từng câu: 'unanswered' | 'correct' | 'wrong'
+        let selectedOption = {}; // Lưu đáp án đã chọn của từng câu
+        let forceShowMessage = true; // Hiển thị sẵn thông điệp "MẸ LÀ TẤT CẢ" theo ảnh gốc
+        let isPreviewMode = false; // Trạng thái nút Con mắt xem trước
+
+        // Khởi tạo trò chơi khi tải trang
+        function initGame() {
+            QUESTIONS.forEach(q => {
+                questionState[q.id] = 'unanswered';
+                selectedOption[q.id] = null;
+            });
+            isPreviewMode = false;
+            updatePreviewButtonUI();
+            renderMatrix();
+            renderQuestions();
+            updateScoreUI();
+        }
+
+        // Vẽ bảng ma trận chữ cái
+        function renderMatrix() {
+            const board = document.getElementById('matrix-board');
+            board.innerHTML = '';
+
+            MATRIX_DATA.forEach((row, rIdx) => {
+                row.forEach((letter, cIdx) => {
+                    const cell = document.createElement('div');
+                    cell.className = 'matrix-cell';
+                    cell.dataset.letter = letter;
+                    cell.textContent = letter;
+                    board.appendChild(cell);
+                });
+            });
+        }
+
+        // Tô màu hoặc xóa màu các ô có chữ cái tương ứng
+        function updateMatrixColors() {
+            // Tìm các chữ cái đã được giải đúng
+            const unlockedLetters = new Set();
+            QUESTIONS.forEach(q => {
+                if (questionState[q.id] === 'correct') {
+                    unlockedLetters.add(q.correctLetter);
+                }
+            });
+
+            const cells = document.querySelectorAll('.matrix-cell');
+            cells.forEach(cell => {
+                const letter = cell.dataset.letter;
+                if (unlockedLetters.has(letter) && COLOR_MAP[letter]) {
+                    cell.style.backgroundColor = COLOR_MAP[letter].color;
+                    cell.classList.add('colored');
+                } else {
+                    cell.style.backgroundColor = '#ffffff';
+                    cell.classList.remove('colored');
+                }
+            });
+        }
+
+        // Vẽ danh sách câu hỏi
+        function renderQuestions() {
+            const container = document.getElementById('questions-container');
+            container.innerHTML = '';
+
+            QUESTIONS.forEach(q => {
+                const card = document.createElement('div');
+                card.className = 'bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-2xs transition';
+                
+                const title = document.createElement('h3');
+                title.className = 'text-xs md:text-sm font-extrabold text-slate-800 mb-2.5 leading-snug';
+                title.textContent = q.question;
+                card.appendChild(title);
+
+                const optionsGrid = document.createElement('div');
+                optionsGrid.className = `grid ${q.layout} gap-2`;
+
+                const state = questionState[q.id];
+                const chosen = selectedOption[q.id];
+
+                q.options.forEach(opt => {
+                    const btn = document.createElement('button');
+                    let stateClass = '';
+                    if ( chosen === opt.letter ) {
+                        stateClass = (state === 'correct') ? 'correct' : 'wrong';
+                    }
+
+                    btn.className = `option-btn ${stateClass} flex items-center gap-2 w-full text-left px-2.5 py-2 rounded-full border border-slate-200 bg-white text-xs md:text-[13px] font-bold text-slate-700`;
+                    // Khóa nút nếu câu hỏi đã trả lời (đúng hoặc sai)
+                    if (state !== 'unanswered') {
+                        btn.disabled = true;
+                    }
+
+                    btn.onclick = () => handleSelectAnswer(q, opt.letter);
+
+                    btn.innerHTML = `
+                        <span class="badge-letter w-6 h-6 rounded-full bg-amber-100 text-amber-800 font-extrabold text-[11px] flex items-center justify-center shrink-0 transition">
+                            ${opt.letter}
+                        </span>
+                        <span class="truncate">${opt.text}</span>
+                    `;
+
+                    optionsGrid.appendChild(btn);
+                });
+
+                card.appendChild(optionsGrid);
+                container.appendChild(card);
+            });
+        }
+
+        // Xử lý khi học sinh bấm chọn đáp án
+        function handleSelectAnswer(questionObj, chosenLetter) {
+            const qId = questionObj.id;
+            if (questionState[qId] !== 'unanswered') return;
+
+            selectedOption[qId] = chosenLetter;
+            const statusEl = document.getElementById('status-message');
+
+            if (chosenLetter === questionObj.correctLetter) {
+                questionState[qId] = 'correct';
+                statusEl.textContent = `Câu ${qId} đúng! Các ô chữ ${chosenLetter} đã được tô màu.`;
+                statusEl.className = 'text-center text-xs md:text-sm font-extrabold text-emerald-600 min-h-[20px]';
+            } else {
+                questionState[qId] = 'wrong';
+                statusEl.textContent = `Câu ${qId} chưa đúng! Hãy nhấn "LÀM LẠI CÂU SAI" để thử lại nhé.`;
+                statusEl.className = 'text-center text-xs md:text-sm font-extrabold text-red-500 min-h-[20px]';
+            }
+
+            renderQuestions();
+            updateMatrixColors();
+            updateScoreUI();
+        }
+
+        // Cập nhật điểm số và thông điệp
+        function updateScoreUI() {
+            const correctCount = Object.values(questionState).filter(s => s === 'correct').length;
+            const total = QUESTIONS.length;
+            document.getElementById('score-badge').textContent = `${correctCount}/${total} đúng`;
+
+            const msgEl = document.getElementById('secret-message');
+            const toggleBtn = document.getElementById('toggle-msg-btn');
+
+            if (correctCount === total || forceShowMessage) {
+                msgEl.textContent = 'MẸ LÀ TẤT CẢ';
+                toggleBtn.textContent = 'Ẩn đi';
+            } else {
+                msgEl.textContent = `??? (Đã mở ${correctCount}/10 mảnh ghép)`;
+                toggleBtn.textContent = 'Hiện luôn';
+            }
+
+            if (correctCount === total) {
+                const statusEl = document.getElementById('status-message');
+                statusEl.textContent = '🎉 Chúc mừng em đã hoàn thành xuất sắc 10/10 câu hỏi và giải mã bức tranh "MẸ LÀ TẤT CẢ"!';
+                statusEl.className = 'text-center text-xs md:text-sm font-extrabold text-emerald-600 min-h-[20px] animate-pulse';
+            }
+        }
+
+        // Nút "LÀM LẠI CÂU SAI"
+        function retryWrongQuestions() {
+            let hasWrong = false;
+            QUESTIONS.forEach(q => {
+                if (questionState[q.id] === 'wrong') {
+                    questionState[q.id] = 'unanswered';
+                    selectedOption[q.id] = null;
+                    hasWrong = true;
+                }
+            });
+
+            const statusEl = document.getElementById('status-message');
+            if (hasWrong) {
+                renderQuestions();
+                updateScoreUI();
+                statusEl.textContent = 'Đã đặt lại các câu trả lời sai. Em hãy chọn lại đáp án đúng nhé!';
+                statusEl.className = 'text-center text-xs md:text-sm font-extrabold text-blue-600 min-h-[20px]';
+            } else {
+                statusEl.textContent = 'Hiện không có câu nào chọn sai cần làm lại!';
+                statusEl.className = 'text-center text-xs md:text-sm font-extrabold text-slate-500 min-h-[20px]';
+            }
+        }
+
+        // Nút Reset toàn bộ trò chơi
+        function resetAllGame() {
+            forceShowMessage = true;
+            initGame();
+            const statusEl = document.getElementById('status-message');
+            statusEl.textContent = 'Đã làm mới toàn bộ trò chơi! Hãy bắt đầu lại nhé.';
+            statusEl.className = 'text-center text-xs md:text-sm font-extrabold text-emerald-600 min-h-[20px]';
+        }
+
+        // Nút Con mắt: Bật/tắt xem nhanh toàn bộ bức tranh hoàn chỉnh với 1 cú nhấp chuột
+        function revealAllColors() {
+            const statusEl = document.getElementById('status-message');
+            if (!isPreviewMode) {
+                isPreviewMode = true;
+                QUESTIONS.forEach(q => {
+                    questionState[q.id] = 'correct';
+                    selectedOption[q.id] = q.correctLetter;
+                });
+                updatePreviewButtonUI();
+                renderQuestions();
+                updateMatrixColors();
+                updateScoreUI();
+                statusEl.textContent = '👁️ Đang ở chế độ Xem trước toàn bộ bức tranh và đáp án đúng!';
+                statusEl.className = 'text-center text-xs md:text-sm font-extrabold text-amber-600 min-h-[20px]';
+            } else {
+                resetAllGame();
+            }
+        }
+
+        function updatePreviewButtonUI() {
+            const btn = document.getElementById('preview-eye-btn');
+            if (!btn) return;
+            if (isPreviewMode) {
+                btn.className = 'no-print w-8 h-8 rounded-full bg-amber-500 border border-amber-600 flex items-center justify-center text-white hover:bg-amber-600 transition shadow-sm';
+            } else {
+                btn.className = 'no-print w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-amber-50 hover:text-amber-600 transition shadow-sm';
+            }
+        }
+
+        // Ẩn / Hiện thông điệp thủ công
+        function toggleMessage() {
+            forceShowMessage = !forceShowMessage;
+            updateScoreUI();
+        }
+
+        // Nút Toàn màn hình
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+        // Modal đổi tên giáo viên
+        function editTeacherName() {
+            const modal = document.getElementById('teacher-modal');
+            const input = document.getElementById('teacher-input');
+            input.value = document.getElementById('teacher-name').textContent;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            input.focus();
+        }
+
+        function closeTeacherModal() {
+            const modal = document.getElementById('teacher-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function saveTeacherName() {
+            const val = document.getElementById('teacher-input').value.trim();
+            if (val) {
+                document.getElementById('teacher-name').textContent = val;
+            }
+            closeTeacherModal();
+        }
+
+        // Khởi chạy khi DOM sẵn sàng
+        window.addEventListener('DOMContentLoaded', initGame);
+    </script>
+</body>
+</html>
